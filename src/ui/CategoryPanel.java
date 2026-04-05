@@ -3,6 +3,7 @@ package ui;
 import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
+import javax.swing.tree.DefaultTreeCellRenderer;
 import java.awt.*;
 import model.category.Category;
 import service.CategoryService;
@@ -14,6 +15,7 @@ public class CategoryPanel extends JPanel {
     private DefaultMutableTreeNode rootNode;
     private JButton addCategoryBtn;
     private JButton addSubCategoryBtn;
+    private JButton editCategoryBtn;
     private JButton deleteCategoryBtn;
     private CategoryService categoryService;
     private long currentUserId;
@@ -25,11 +27,13 @@ public class CategoryPanel extends JPanel {
         rootNode = new DefaultMutableTreeNode("Categories");
         treeModel = new DefaultTreeModel(rootNode);
         categoryTree = new JTree(treeModel);
+        categoryTree.setCellRenderer(new CategoryTreeRenderer());
         JScrollPane treeScroll = new JScrollPane(categoryTree);
 
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         addCategoryBtn = new JButton("Add Category");
         addSubCategoryBtn = new JButton("Add Subcategory");
+        editCategoryBtn = new JButton("Edit");
         deleteCategoryBtn = new JButton("Delete");
 
         addCategoryBtn.addActionListener(e -> addCategory(null));
@@ -42,13 +46,14 @@ public class CategoryPanel extends JPanel {
                 JOptionPane.showMessageDialog(this, "Select a parent category first.");
             }
         });
+        editCategoryBtn.addActionListener(e -> editCategory());
         deleteCategoryBtn.addActionListener(e -> deleteCategory());
 
         buttonPanel.add(addCategoryBtn);
         buttonPanel.add(addSubCategoryBtn);
+        buttonPanel.add(editCategoryBtn);
         buttonPanel.add(deleteCategoryBtn);
 
-        add(new JLabel("  Category Manager", JLabel.LEFT), BorderLayout.NORTH);
         add(treeScroll, BorderLayout.CENTER);
         add(buttonPanel, BorderLayout.SOUTH);
     }
@@ -62,6 +67,7 @@ public class CategoryPanel extends JPanel {
             rootNode.add(node);
         }
         treeModel.reload();
+        expandAllNodes(categoryTree, 0, categoryTree.getRowCount());
     }
 
     private DefaultMutableTreeNode buildTreeNode(Category category) {
@@ -72,11 +78,42 @@ public class CategoryPanel extends JPanel {
         return node;
     }
 
+    private void expandAllNodes(JTree tree, int startRow, int rowCount) {
+        for (int i = startRow; i < rowCount; i++) {
+            tree.expandRow(i);
+        }
+        if (tree.getRowCount() != rowCount) {
+            expandAllNodes(tree, rowCount, tree.getRowCount());
+        }
+    }
+
     private void addCategory(Long parentId) {
         String name = JOptionPane.showInputDialog(this, "Category name:");
         if (name != null && !name.trim().isEmpty()) {
             String icon = JOptionPane.showInputDialog(this, "Icon (optional):");
             categoryService.addCategory(name.trim(), icon, parentId, currentUserId);
+            loadTree(currentUserId);
+        }
+    }
+
+    private void editCategory() {
+        DefaultMutableTreeNode selected = (DefaultMutableTreeNode) categoryTree.getLastSelectedPathComponent();
+        if (selected == null || !(selected.getUserObject() instanceof Category)) {
+            JOptionPane.showMessageDialog(this, "Select a category to edit.");
+            return;
+        }
+        Category cat = (Category) selected.getUserObject();
+        if (cat.isDefault()) {
+            JOptionPane.showMessageDialog(this, "Cannot edit default categories.");
+            return;
+        }
+
+        String newName = JOptionPane.showInputDialog(this, "New name:", cat.getName());
+        if (newName != null && !newName.trim().isEmpty()) {
+            String newIcon = JOptionPane.showInputDialog(this, "New icon:", cat.getIcon());
+            cat.setName(newName.trim());
+            cat.setIcon(newIcon);
+            categoryService.updateCategory(cat);
             loadTree(currentUserId);
         }
     }
@@ -90,12 +127,32 @@ public class CategoryPanel extends JPanel {
                 return;
             }
             int confirm = JOptionPane.showConfirmDialog(this,
-                    "Delete '" + cat.getName() + "'?", "Confirm", JOptionPane.YES_NO_OPTION);
+                    "Delete '" + cat.getName() + "' and all subcategories?", "Confirm", JOptionPane.YES_NO_OPTION);
             if (confirm == JOptionPane.YES_OPTION) {
                 categoryService.deleteCategory(cat.getId());
                 loadTree(currentUserId);
             }
         }
     }
-}
 
+    // Custom renderer to show category with icon text
+    private static class CategoryTreeRenderer extends DefaultTreeCellRenderer {
+        @Override
+        public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel,
+                boolean expanded, boolean leaf, int row, boolean hasFocus) {
+            super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus);
+            if (value instanceof DefaultMutableTreeNode) {
+                Object obj = ((DefaultMutableTreeNode) value).getUserObject();
+                if (obj instanceof Category) {
+                    Category cat = (Category) obj;
+                    String display = cat.getName();
+                    if (cat.getIcon() != null && !cat.getIcon().isEmpty()) {
+                        display = "[" + cat.getIcon() + "] " + display;
+                    }
+                    setText(display);
+                }
+            }
+            return this;
+        }
+    }
+}
