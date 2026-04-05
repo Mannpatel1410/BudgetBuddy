@@ -39,6 +39,10 @@ public class CategoryService {
         return categoryDAO.findByUserId(userId);
     }
 
+    public Category getById(long id) {
+        return categoryDAO.findById(id);
+    }
+
     public void addCategory(String name, String icon, Long parentId, long userId) {
         Category c = new Category();
         c.setUserId(userId);

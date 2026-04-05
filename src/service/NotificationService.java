@@ -19,4 +19,11 @@ public class NotificationService {
     public void markAsRead(long notificationId) {
         notificationDAO.markAsRead(notificationId);
     }
+
+    public void markAllAsRead(long userId) {
+        List<Notification> unread = getUnread(userId);
+        for (Notification n : unread) {
+            notificationDAO.markAsRead(n.getId());
+        }
+    }
 }
