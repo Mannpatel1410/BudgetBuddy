@@ -2,14 +2,24 @@ package decorator;
 
 import model.transaction.Transaction;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class TagDecorator extends TransactionDecorator {
-    public TagDecorator(Transaction wrapped, String tag) {
-        super(wrapped);
-        String existing = wrapped.getTags() == null ? "" : wrapped.getTags().trim();
-        if (existing.isEmpty()) {
-            wrapped.setTags(tag);
-        } else {
-            wrapped.setTags(existing + "," + tag);
-        }
+    private List<String> tags;
+
+    public TagDecorator(Transaction transaction, List<String> tags) {
+        super(transaction);
+        this.tags = tags == null ? new ArrayList<>() : new ArrayList<>(tags);
+    }
+
+    @Override
+    public String getDescription() {
+        return wrappedTransaction.getDescription() + " [Tags: " + String.join(", ", tags) + "]";
+    }
+
+    @Override
+    public String getTags() {
+        return String.join(",", tags);
     }
 }
