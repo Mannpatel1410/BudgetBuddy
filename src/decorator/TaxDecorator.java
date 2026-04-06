@@ -3,13 +3,25 @@ package decorator;
 import model.transaction.Transaction;
 
 public class TaxDecorator extends TransactionDecorator {
-    public TaxDecorator(Transaction wrapped, double taxRate) {
-        super(wrapped);
-        wrapped.setTaxRate(taxRate);
+    private double taxRate;
+
+    public TaxDecorator(Transaction transaction, double taxRate) {
+        super(transaction);
+        this.taxRate = taxRate;
     }
 
     @Override
     public double getAmount() {
-        return wrapped.getAmount() * (1 + wrapped.getTaxRate());
+        return wrappedTransaction.getAmount() + (wrappedTransaction.getAmount() * taxRate / 100.0);
+    }
+
+    @Override
+    public String getDescription() {
+        return wrappedTransaction.getDescription() + " [Tax: " + taxRate + "%]";
+    }
+
+    @Override
+    public double getTaxRate() {
+        return taxRate;
     }
 }

@@ -6,54 +6,86 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public abstract class TransactionDecorator extends Transaction {
-    protected final Transaction wrapped;
+    protected Transaction wrappedTransaction;
 
-    public TransactionDecorator(Transaction wrapped) {
-        this.wrapped = wrapped;
+    public TransactionDecorator(Transaction transaction) {
+        this.wrappedTransaction = transaction;
+        this.id = transaction.getId();
+        this.accountId = transaction.getAccountId();
+        this.categoryId = transaction.getCategoryId();
+        this.type = transaction.getType();
+        this.amount = transaction.getAmount();
+        this.description = transaction.getDescription();
+        this.isRecurring = transaction.isRecurring();
+        this.tags = transaction.getTags();
+        this.taxRate = transaction.getTaxRate();
+        this.transactionDate = transaction.getTransactionDate();
+        this.createdAt = transaction.getCreatedAt();
     }
 
     @Override
-    public long getId() { return wrapped.getId(); }
+    public long getId() { return wrappedTransaction.getId(); }
+
     @Override
-    public void setId(long id) { wrapped.setId(id); }
+    public void setId(long id) { wrappedTransaction.setId(id); }
+
     @Override
-    public long getAccountId() { return wrapped.getAccountId(); }
+    public long getAccountId() { return wrappedTransaction.getAccountId(); }
+
     @Override
-    public void setAccountId(long accountId) { wrapped.setAccountId(accountId); }
+    public void setAccountId(long accountId) { wrappedTransaction.setAccountId(accountId); }
+
     @Override
-    public long getCategoryId() { return wrapped.getCategoryId(); }
+    public long getCategoryId() { return wrappedTransaction.getCategoryId(); }
+
     @Override
-    public void setCategoryId(long categoryId) { wrapped.setCategoryId(categoryId); }
+    public void setCategoryId(long categoryId) { wrappedTransaction.setCategoryId(categoryId); }
+
     @Override
-    public String getType() { return wrapped.getType(); }
+    public String getType() { return wrappedTransaction.getType(); }
+
     @Override
-    public void setType(String type) { wrapped.setType(type); }
+    public void setType(String type) { wrappedTransaction.setType(type); }
+
     @Override
-    public double getAmount() { return wrapped.getAmount(); }
+    public double getAmount() { return wrappedTransaction.getAmount(); }
+
     @Override
-    public void setAmount(double amount) { wrapped.setAmount(amount); }
+    public void setAmount(double amount) { wrappedTransaction.setAmount(amount); }
+
     @Override
-    public String getDescription() { return wrapped.getDescription(); }
+    public String getDescription() { return wrappedTransaction.getDescription(); }
+
     @Override
-    public void setDescription(String description) { wrapped.setDescription(description); }
+    public void setDescription(String description) { wrappedTransaction.setDescription(description); }
+
     @Override
-    public boolean isRecurring() { return wrapped.isRecurring(); }
+    public boolean isRecurring() { return wrappedTransaction.isRecurring(); }
+
     @Override
-    public void setRecurring(boolean recurring) { wrapped.setRecurring(recurring); }
+    public void setRecurring(boolean recurring) { wrappedTransaction.setRecurring(recurring); }
+
     @Override
-    public String getTags() { return wrapped.getTags(); }
+    public String getTags() { return wrappedTransaction.getTags(); }
+
     @Override
-    public void setTags(String tags) { wrapped.setTags(tags); }
+    public void setTags(String tags) { wrappedTransaction.setTags(tags); }
+
     @Override
-    public double getTaxRate() { return wrapped.getTaxRate(); }
+    public double getTaxRate() { return wrappedTransaction.getTaxRate(); }
+
     @Override
-    public void setTaxRate(double taxRate) { wrapped.setTaxRate(taxRate); }
+    public void setTaxRate(double taxRate) { wrappedTransaction.setTaxRate(taxRate); }
+
     @Override
-    public LocalDate getTransactionDate() { return wrapped.getTransactionDate(); }
+    public LocalDate getTransactionDate() { return wrappedTransaction.getTransactionDate(); }
+
     @Override
-    public void setTransactionDate(LocalDate transactionDate) { wrapped.setTransactionDate(transactionDate); }
+    public void setTransactionDate(LocalDate transactionDate) { wrappedTransaction.setTransactionDate(transactionDate); }
+
     @Override
-    public LocalDateTime getCreatedAt() { return wrapped.getCreatedAt(); }
+    public LocalDateTime getCreatedAt() { return wrappedTransaction.getCreatedAt(); }
+
     @Override
-    public void setCreatedAt(LocalDateTime createdAt) { wrapped.setCreatedAt(createdAt); }
+    public void setCreatedAt(LocalDateTime createdAt) { wrappedTransaction.setCreatedAt(createdAt); }
 }

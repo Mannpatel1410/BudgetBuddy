@@ -1,15 +1,15 @@
 package command;
 
-import dao.TransactionDAO;
 import model.transaction.Transaction;
+import dao.TransactionDAO;
 
 public class AddTransactionCommand implements TransactionCommand {
-    private final TransactionDAO transactionDAO;
-    private final Transaction transaction;
+    private Transaction transaction;
+    private TransactionDAO transactionDAO;
 
-    public AddTransactionCommand(TransactionDAO transactionDAO, Transaction transaction) {
-        this.transactionDAO = transactionDAO;
+    public AddTransactionCommand(Transaction transaction, TransactionDAO dao) {
         this.transaction = transaction;
+        this.transactionDAO = dao;
     }
 
     @Override
@@ -19,8 +19,6 @@ public class AddTransactionCommand implements TransactionCommand {
 
     @Override
     public void undo() {
-        if (transaction.getId() > 0) {
-            transactionDAO.delete(transaction.getId());
-        }
+        transactionDAO.delete(transaction.getId());
     }
 }

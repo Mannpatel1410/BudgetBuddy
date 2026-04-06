@@ -1,6 +1,6 @@
 package dao;
 
-// import db.DatabaseManager;
+import db.DatabaseManager;
 import factory.TransactionFactory;
 import model.transaction.Transaction;
 
@@ -15,8 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class TransactionDAO {
-    // private final Connection conn = DatabaseManager.getInstance().getConnection();
-    private final Connection conn = null;
+    private final Connection conn = DatabaseManager.getInstance().getConnection();
 
     public void insert(Transaction t) {
         String sql = "INSERT INTO `transaction` (account_id, category_id, type, amount, description, is_recurring, tags, tax_rate, transaction_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
@@ -72,6 +71,21 @@ public class TransactionDAO {
     public List<Transaction> findByUserId(long userId) {
         String sql = "SELECT t.* FROM `transaction` t JOIN account a ON t.account_id = a.id WHERE a.user_id = ?";
         return findByLong(sql, userId);
+    }
+
+    public long findUserIdByAccountId(long accountId) {
+        String sql = "SELECT user_id FROM account WHERE id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, accountId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getLong("user_id");
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to find user by account id", e);
+        }
+        return -1;
     }
 
     public void update(Transaction t) {
