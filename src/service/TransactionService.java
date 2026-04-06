@@ -11,16 +11,20 @@ import command.DeleteTransactionCommand;
 import command.EditTransactionCommand;
 import dao.TransactionDAO;
 import factory.TransactionFactory;
+import model.budget.Budget;
 import model.transaction.Transaction;
 
 import java.time.LocalDate;
+import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class TransactionService {
     private final TransactionDAO transactionDAO = new TransactionDAO();
+    private final BudgetService budgetService = new BudgetService();
     private final ValidationHandler validationChain;
-    private final CommandHistory commandHistory = new CommandHistory();
+    private CommandHistory commandHistory = new CommandHistory();
 
     public TransactionService() {
         validationChain = new AmountValidator();
@@ -32,15 +36,19 @@ public class TransactionService {
 
     public boolean addTransaction(String type, long accountId, long categoryId,
                                   double amount, String description, LocalDate date) {
-        Transaction transaction = TransactionFactory.createTransaction(
-                type, accountId, categoryId, amount, description, date
-        );
+        Transaction t = TransactionFactory.createTransaction(type, accountId, categoryId, amount, description, date);
+        return addTransaction(t);
+    }
 
+    public boolean addTransaction(Transaction transaction) {
         if (!validationChain.validate(transaction)) {
             return false;
         }
 
-        commandHistory.execute(new AddTransactionCommand(transactionDAO, transaction));
+        AddTransactionCommand cmd = new AddTransactionCommand(transaction, transactionDAO);
+        commandHistory.executeCommand(cmd);
+
+        recordBudgetSpending(transaction);
         return true;
     }
 
@@ -52,7 +60,13 @@ public class TransactionService {
             return false;
         }
 
-        commandHistory.execute(new EditTransactionCommand(transactionDAO, transaction));
+        Transaction oldState = transactionDAO.findById(transaction.getId());
+        if (oldState == null) {
+            return false;
+        }
+
+        EditTransactionCommand cmd = new EditTransactionCommand(oldState, transaction, transactionDAO);
+        commandHistory.executeCommand(cmd);
         return true;
     }
 
@@ -72,14 +86,50 @@ public class TransactionService {
     }
 
     public void deleteTransaction(long id) {
-        commandHistory.execute(new DeleteTransactionCommand(transactionDAO, id));
+        Transaction existing = transactionDAO.findById(id);
+        if (existing == null) {
+            return;
+        }
+        DeleteTransactionCommand cmd = new DeleteTransactionCommand(existing, transactionDAO);
+        commandHistory.executeCommand(cmd);
     }
 
-    public boolean undo() {
-        return commandHistory.undo();
+    public void undo() {
+        commandHistory.undo();
     }
 
-    public boolean redo() {
-        return commandHistory.redo();
+    public void redo() {
+        commandHistory.redo();
+    }
+
+    public boolean canUndo() {
+        return commandHistory.canUndo();
+    }
+
+    public boolean canRedo() {
+        return commandHistory.canRedo();
+    }
+
+    private void recordBudgetSpending(Transaction transaction) {
+        if (!"EXPENSE".equalsIgnoreCase(transaction.getType())) {
+            return;
+        }
+
+        long userId = transactionDAO.findUserIdByAccountId(transaction.getAccountId());
+        if (userId <= 0) {
+            return;
+        }
+
+        LocalDate txDate = transaction.getTransactionDate() != null ? transaction.getTransactionDate() : LocalDate.now();
+        String month = txDate.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+        int year = txDate.getYear();
+
+        List<Budget> budgets = budgetService.getBudgetsForMonth(userId, month, year);
+        for (Budget budget : budgets) {
+            if (budget.getCategoryId() == transaction.getCategoryId()) {
+                budgetService.recordSpending(budget.getId(), transaction.getAmount(), transaction);
+                break;
+            }
+        }
     }
 }
