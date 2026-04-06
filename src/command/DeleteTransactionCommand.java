@@ -1,28 +1,24 @@
 package command;
 
-import dao.TransactionDAO;
 import model.transaction.Transaction;
+import dao.TransactionDAO;
 
 public class DeleteTransactionCommand implements TransactionCommand {
-    private final TransactionDAO transactionDAO;
-    private final long transactionId;
-    private Transaction deletedBackup;
+    private Transaction transaction;
+    private TransactionDAO transactionDAO;
 
-    public DeleteTransactionCommand(TransactionDAO transactionDAO, long transactionId) {
-        this.transactionDAO = transactionDAO;
-        this.transactionId = transactionId;
+    public DeleteTransactionCommand(Transaction transaction, TransactionDAO dao) {
+        this.transaction = transaction;
+        this.transactionDAO = dao;
     }
 
     @Override
     public void execute() {
-        deletedBackup = transactionDAO.findById(transactionId);
-        transactionDAO.delete(transactionId);
+        transactionDAO.delete(transaction.getId());
     }
 
     @Override
     public void undo() {
-        if (deletedBackup != null) {
-            transactionDAO.insert(deletedBackup);
-        }
+        transactionDAO.insert(transaction);
     }
 }
