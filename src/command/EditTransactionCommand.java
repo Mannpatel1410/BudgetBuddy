@@ -1,28 +1,26 @@
 package command;
 
-import dao.TransactionDAO;
 import model.transaction.Transaction;
+import dao.TransactionDAO;
 
 public class EditTransactionCommand implements TransactionCommand {
-    private final TransactionDAO transactionDAO;
-    private final Transaction updated;
-    private Transaction previous;
+    private Transaction oldState;
+    private Transaction newState;
+    private TransactionDAO transactionDAO;
 
-    public EditTransactionCommand(TransactionDAO transactionDAO, Transaction updated) {
-        this.transactionDAO = transactionDAO;
-        this.updated = updated;
+    public EditTransactionCommand(Transaction oldState, Transaction newState, TransactionDAO dao) {
+        this.oldState = oldState;
+        this.newState = newState;
+        this.transactionDAO = dao;
     }
 
     @Override
     public void execute() {
-        previous = transactionDAO.findById(updated.getId());
-        transactionDAO.update(updated);
+        transactionDAO.update(newState);
     }
 
     @Override
     public void undo() {
-        if (previous != null) {
-            transactionDAO.update(previous);
-        }
+        transactionDAO.update(oldState);
     }
 }

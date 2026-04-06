@@ -81,18 +81,20 @@ public class TransactionPanel extends JPanel {
         });
 
         undoBtn.addActionListener(e -> {
-            if (!transactionService.undo()) {
+            if (!transactionService.canUndo()) {
                 JOptionPane.showMessageDialog(this, "Nothing to undo.");
                 return;
             }
+            transactionService.undo();
             refreshTable();
         });
 
         redoBtn.addActionListener(e -> {
-            if (!transactionService.redo()) {
+            if (!transactionService.canRedo()) {
                 JOptionPane.showMessageDialog(this, "Nothing to redo.");
                 return;
             }
+            transactionService.redo();
             refreshTable();
         });
 
