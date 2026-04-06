@@ -1,35 +1,38 @@
 package command;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
+import java.util.Stack;
 
 public class CommandHistory {
-    private final Deque<TransactionCommand> undoStack = new ArrayDeque<>();
-    private final Deque<TransactionCommand> redoStack = new ArrayDeque<>();
+    private Stack<TransactionCommand> undoStack = new Stack<>();
+    private Stack<TransactionCommand> redoStack = new Stack<>();
 
-    public void execute(TransactionCommand command) {
-        command.execute();
-        undoStack.push(command);
+    public void executeCommand(TransactionCommand cmd) {
+        cmd.execute();
+        undoStack.push(cmd);
         redoStack.clear();
     }
 
-    public boolean undo() {
-        if (undoStack.isEmpty()) {
-            return false;
+    public void undo() {
+        if (!undoStack.isEmpty()) {
+            TransactionCommand cmd = undoStack.pop();
+            cmd.undo();
+            redoStack.push(cmd);
         }
-        TransactionCommand command = undoStack.pop();
-        command.undo();
-        redoStack.push(command);
-        return true;
     }
 
-    public boolean redo() {
-        if (redoStack.isEmpty()) {
-            return false;
+    public void redo() {
+        if (!redoStack.isEmpty()) {
+            TransactionCommand cmd = redoStack.pop();
+            cmd.execute();
+            undoStack.push(cmd);
         }
-        TransactionCommand command = redoStack.pop();
-        command.execute();
-        undoStack.push(command);
-        return true;
+    }
+
+    public boolean canUndo() {
+        return !undoStack.isEmpty();
+    }
+
+    public boolean canRedo() {
+        return !redoStack.isEmpty();
     }
 }
