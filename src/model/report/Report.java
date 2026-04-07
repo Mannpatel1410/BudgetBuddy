@@ -1,6 +1,9 @@
 package model.report;
 
+import model.category.Category;
+
 import java.time.LocalDateTime;
+import java.util.List;
 
 public class Report {
     private long id;
@@ -12,6 +15,7 @@ public class Report {
     private double totalExpense;
     private double netSavings;
     private LocalDateTime generatedAt;
+    private List<Category> categories;
 
     public Report() {}
 
@@ -45,4 +49,6 @@ public class Report {
     public void setNetSavings(double netSavings) { this.netSavings = netSavings; }
     public LocalDateTime getGeneratedAt() { return generatedAt; }
     public void setGeneratedAt(LocalDateTime generatedAt) { this.generatedAt = generatedAt; }
+    public List<Category> getCategories() { return categories; }
+    public void setCategories(List<Category> categories) { this.categories = categories; }
 }

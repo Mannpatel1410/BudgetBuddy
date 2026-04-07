@@ -2,13 +2,20 @@ package service;
 
 import dao.ReportDAO;
 import dao.TransactionDAO;
+import iterator.TransactionIterator;
+import model.report.Report;
+import model.transaction.Transaction;
 import strategy.CategoryReportStrategy;
 import strategy.MonthlyReportStrategy;
 import strategy.ReportStrategy;
 import strategy.WeeklyReportStrategy;
-import model.report.Report;
-import model.transaction.Transaction;
+import template.CSVExport;
+import template.ExportTemplate;
+import template.PDFExport;
+
+import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Predicate;
 
 public class ReportService {
     private ReportDAO reportDAO = new ReportDAO();
@@ -44,5 +51,25 @@ public class ReportService {
 
     public List<Report> getReportHistory(long userId) {
         return reportDAO.findByUserId(userId);
+    }
+
+    public void exportReport(Report report, String format, String filePath) {
+        ExportTemplate exporter;
+        if ("PDF".equalsIgnoreCase(format)) {
+            exporter = new PDFExport();
+        } else {
+            exporter = new CSVExport();
+        }
+        exporter.export(report, filePath);
+    }
+
+    public List<Transaction> getFilteredTransactions(long userId, Predicate<Transaction> filter) {
+        List<Transaction> all = transactionDAO.findByUserId(userId);
+        TransactionIterator iter = new TransactionIterator(all, filter);
+        List<Transaction> result = new ArrayList<>();
+        while (iter.hasNext()) {
+            result.add(iter.next());
+        }
+        return result;
     }
 }
