@@ -17,6 +17,7 @@ public class DashboardPanel extends JPanel {
     private JLabel netSavingsLabel;
     private JTable summaryTable;
     private DefaultTableModel tableModel;
+    private BarChartPanel barChartPanel;
 
     private final TransactionService transactionService = new TransactionService();
     private final long currentUserId = 1L;
@@ -43,7 +44,7 @@ public class DashboardPanel extends JPanel {
         refreshBtn.addActionListener(e -> loadDashboard(currentUserId));
 
         JPanel northPanel = new JPanel(new BorderLayout());
-        northPanel.add(topBar,    BorderLayout.NORTH);
+        northPanel.add(topBar,     BorderLayout.NORTH);
         northPanel.add(cardsPanel, BorderLayout.CENTER);
 
         // ── Center: monthly breakdown table ──────────────────────────────────
@@ -58,8 +59,16 @@ public class DashboardPanel extends JPanel {
                 BorderFactory.createEtchedBorder(), "Monthly Breakdown",
                 TitledBorder.LEFT, TitledBorder.TOP));
 
-        add(northPanel,  BorderLayout.NORTH);
-        add(scrollPane,  BorderLayout.CENTER);
+        // ── South: bar chart (Java2D) ─────────────────────────────────────────
+        barChartPanel = new BarChartPanel();
+        barChartPanel.setPreferredSize(new Dimension(0, 180));
+        barChartPanel.setBorder(BorderFactory.createTitledBorder(
+                BorderFactory.createEtchedBorder(), "Income vs Expense by Month",
+                TitledBorder.LEFT, TitledBorder.TOP));
+
+        add(northPanel,    BorderLayout.NORTH);
+        add(scrollPane,    BorderLayout.CENTER);
+        add(barChartPanel, BorderLayout.SOUTH);
 
         loadDashboard(currentUserId);
     }
@@ -108,6 +117,8 @@ public class DashboardPanel extends JPanel {
                     String.format("$%.2f", inc - exp)
             });
         }
+
+        barChartPanel.setData(monthly);
     }
 
     private JPanel buildCard(String title, JLabel valueLabel, Color accentColor) {
@@ -123,8 +134,89 @@ public class DashboardPanel extends JPanel {
         valueLabel.setFont(valueLabel.getFont().deriveFont(Font.BOLD, 20f));
         valueLabel.setForeground(accentColor);
 
-        card.add(titleLabel,  BorderLayout.NORTH);
-        card.add(valueLabel,  BorderLayout.CENTER);
+        card.add(titleLabel, BorderLayout.NORTH);
+        card.add(valueLabel, BorderLayout.CENTER);
         return card;
+    }
+
+    // ── Inner class: Java2D bar chart ─────────────────────────────────────────
+
+    private static class BarChartPanel extends JPanel {
+
+        private Map<String, double[]> data = new LinkedHashMap<>();
+        private double cachedMaxVal = 1;
+
+        void setData(Map<String, double[]> data) {
+            this.data = data;
+            cachedMaxVal = 1;
+            for (double[] vals : data.values()) {
+                cachedMaxVal = Math.max(cachedMaxVal, Math.max(vals[0], vals[1]));
+            }
+            repaint();
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            if (data == null || data.isEmpty()) return;
+
+            Graphics2D g2 = (Graphics2D) g;
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            int width  = getWidth();
+            int height = getHeight();
+            int padLeft = 50, padRight = 20, padTop = 20, padBottom = 30;
+            int chartWidth  = width  - padLeft - padRight;
+            int chartHeight = height - padTop  - padBottom;
+
+            int n        = data.size();
+            int groupW   = chartWidth / Math.max(n, 1);
+            int barW     = Math.max(4, groupW / 3);
+            int groupIdx = 0;
+
+            Font labelFont = g2.getFont().deriveFont(9f);
+
+            // Draw Y-axis baseline
+            g2.setColor(Color.DARK_GRAY);
+            g2.drawLine(padLeft, padTop, padLeft, padTop + chartHeight);
+            g2.drawLine(padLeft, padTop + chartHeight, padLeft + chartWidth, padTop + chartHeight);
+
+            for (Map.Entry<String, double[]> entry : data.entrySet()) {
+                double inc = entry.getValue()[0];
+                double exp = entry.getValue()[1];
+
+                int x = padLeft + groupIdx * groupW + (groupW - 2 * barW) / 2;
+
+                int incH = (int) (inc / cachedMaxVal * chartHeight);
+                g2.setColor(new Color(76, 175, 80));
+                g2.fillRect(x, padTop + chartHeight - incH, barW, incH);
+
+                int expH = (int) (exp / cachedMaxVal * chartHeight);
+                g2.setColor(new Color(244, 67, 54));
+                g2.fillRect(x + barW + 2, padTop + chartHeight - expH, barW, expH);
+
+                g2.setColor(Color.DARK_GRAY);
+                g2.setFont(labelFont);
+                String label = entry.getKey();
+                int labelX = padLeft + groupIdx * groupW + (groupW - g2.getFontMetrics().stringWidth(label)) / 2;
+                g2.drawString(label, labelX, padTop + chartHeight + 14);
+
+                groupIdx++;
+            }
+
+            // Legend
+            int legendX = padLeft + chartWidth - 120;
+            int legendY = padTop + 10;
+            g2.setColor(new Color(76, 175, 80));
+            g2.fillRect(legendX, legendY, 12, 12);
+            g2.setColor(Color.DARK_GRAY);
+            g2.setFont(g2.getFont().deriveFont(10f));
+            g2.drawString("Income", legendX + 16, legendY + 10);
+
+            g2.setColor(new Color(244, 67, 54));
+            g2.fillRect(legendX + 70, legendY, 12, 12);
+            g2.setColor(Color.DARK_GRAY);
+            g2.drawString("Expense", legendX + 86, legendY + 10);
+        }
     }
 }
