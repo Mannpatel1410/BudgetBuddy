@@ -73,7 +73,9 @@ public class ReportBuilder {
         report.setTotalExpense(totalExpense);
         report.setNetSavings(totalIncome - totalExpense);
         report.setGeneratedAt(LocalDateTime.now());
-        // categories is used in Milestone 3 by CategoryReportStrategy for per-category filtering
+        if (categories != null) {
+            report.setCategories(categories);
+        }
         return report;
     }
 }
