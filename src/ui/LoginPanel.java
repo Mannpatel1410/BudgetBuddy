@@ -13,8 +13,10 @@ public class LoginPanel extends JPanel {
     private JButton signupBtn;
 
     private final UserService userService = new UserService();
+    private final MainFrame mainFrame;
 
-    public LoginPanel() {
+    public LoginPanel(MainFrame mainFrame) {
+        this.mainFrame = mainFrame;
         setLayout(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(8, 8, 8, 8);
@@ -51,18 +53,12 @@ public class LoginPanel extends JPanel {
             String password = new String(passwordField.getPassword());
             User user = userService.login(email, password);
             if (user != null) {
-                JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
-                frame.setContentPane(new TransactionPanel());
-                frame.revalidate();
+                mainFrame.onLoginSuccess(user);
             } else {
                 JOptionPane.showMessageDialog(this, "Invalid email or password.", "Login Failed", JOptionPane.ERROR_MESSAGE);
             }
         });
 
-        signupBtn.addActionListener(e -> {
-            JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
-            frame.setContentPane(new SignupPanel());
-            frame.revalidate();
-        });
+        signupBtn.addActionListener(e -> mainFrame.showPanel("signup"));
     }
 }

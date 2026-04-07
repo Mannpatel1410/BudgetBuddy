@@ -13,8 +13,10 @@ public class SignupPanel extends JPanel {
     private JButton registerBtn;
 
     private final UserService userService = new UserService();
+    private final MainFrame mainFrame;
 
-    public SignupPanel() {
+    public SignupPanel(MainFrame mainFrame) {
+        this.mainFrame = mainFrame;
         setLayout(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(8, 8, 8, 8);
@@ -76,8 +78,6 @@ public class SignupPanel extends JPanel {
     }
 
     private void switchToLogin() {
-        JFrame frame = (JFrame) SwingUtilities.getWindowAncestor(this);
-        frame.setContentPane(new LoginPanel());
-        frame.revalidate();
+        mainFrame.showPanel("login");
     }
 }
