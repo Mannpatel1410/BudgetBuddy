@@ -23,6 +23,10 @@ public class UserService {
         return user;
     }
 
+    public User getUserById(long id) {
+        return userDAO.findById(id);
+    }
+
     public void updateProfile(User user) {
         userDAO.update(user);
     }
