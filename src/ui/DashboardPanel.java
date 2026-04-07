@@ -1,5 +1,6 @@
 package ui;
 
+import facade.DashboardFacade;
 import model.transaction.Transaction;
 import service.TransactionService;
 
@@ -19,8 +20,9 @@ public class DashboardPanel extends JPanel {
     private DefaultTableModel tableModel;
     private BarChartPanel barChartPanel;
 
+    private final DashboardFacade dashboardFacade = new DashboardFacade();
     private final TransactionService transactionService = new TransactionService();
-    private final long currentUserId = 1L;
+    private long currentUserId = 1L;
 
     public DashboardPanel() {
         setLayout(new BorderLayout(10, 10));
@@ -74,12 +76,19 @@ public class DashboardPanel extends JPanel {
     }
 
     public void loadDashboard(long userId) {
+        this.currentUserId = userId;
+
+        double totalIncome  = dashboardFacade.getTotalIncome(userId);
+        double totalExpense = dashboardFacade.getTotalExpense(userId);
+        double netSavings   = dashboardFacade.getNetSavings(userId);
+
+        totalIncomeLabel.setText(String.format("$%.2f", totalIncome));
+        totalExpenseLabel.setText(String.format("$%.2f", totalExpense));
+        netSavingsLabel.setText(String.format("$%.2f", netSavings));
+        netSavingsLabel.setForeground(netSavings >= 0 ? new Color(33, 150, 243) : new Color(244, 67, 54));
+
+        // Aggregate per "YYYY-MM" bucket for monthly breakdown
         List<Transaction> transactions = transactionService.getTransactionsByUser(userId);
-
-        double totalIncome  = 0;
-        double totalExpense = 0;
-
-        // Aggregate per "YYYY-MM" bucket
         Map<String, double[]> monthly = new LinkedHashMap<>();
 
         for (Transaction t : transactions) {
@@ -91,20 +100,11 @@ public class DashboardPanel extends JPanel {
             monthly.putIfAbsent(bucket, new double[]{0, 0});
 
             if ("INCOME".equalsIgnoreCase(t.getType())) {
-                totalIncome += t.getAmount();
                 monthly.get(bucket)[0] += t.getAmount();
             } else if ("EXPENSE".equalsIgnoreCase(t.getType())) {
-                totalExpense += t.getAmount();
                 monthly.get(bucket)[1] += t.getAmount();
             }
         }
-
-        double netSavings = totalIncome - totalExpense;
-
-        totalIncomeLabel.setText(String.format("$%.2f", totalIncome));
-        totalExpenseLabel.setText(String.format("$%.2f", totalExpense));
-        netSavingsLabel.setText(String.format("$%.2f", netSavings));
-        netSavingsLabel.setForeground(netSavings >= 0 ? new Color(33, 150, 243) : new Color(244, 67, 54));
 
         tableModel.setRowCount(0);
         for (Map.Entry<String, double[]> entry : monthly.entrySet()) {
