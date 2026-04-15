@@ -38,7 +38,7 @@ public class ReportPanel extends JPanel {
         JPanel topBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
 
         reportTypeCombo = new JComboBox<>(new String[]{"MONTHLY", "WEEKLY", "CATEGORY"});
-        filterByCombo   = new JComboBox<>(new String[]{"All", "By Type", "By Amount"});
+        filterByCombo   = new JComboBox<>(new String[]{"All Transactions", "Expenses Only", "Income Only", "Large (>$100)"});
         generateBtn  = new JButton("Generate Report");
         exportPdfBtn = new JButton("Export PDF");
         exportCsvBtn = new JButton("Export CSV");
@@ -163,28 +163,27 @@ public class ReportPanel extends JPanel {
     }
 
     private void generateReport() {
-        String type = (String) reportTypeCombo.getSelectedItem();
-        statusLabel.setText("Generating " + type + " report...");
+        String type   = (String) reportTypeCombo.getSelectedItem();
+        String filter = (String) filterByCombo.getSelectedItem();
+        statusLabel.setText("Generating " + type + " report (" + filter + ")...");
         statusLabel.setForeground(new Color(100, 100, 100));
 
         try {
-            Report report = reportService.generateReport(currentUserId, type);
+            Report report = reportService.generateReport(currentUserId, type, getFilterPredicate());
             if (report != null) {
-                String filterChoice = (String) filterByCombo.getSelectedItem();
-                String filterInfo = buildFilterSummary(filterChoice);
-
                 currentReport = report;
                 exportPdfBtn.setEnabled(true);
                 exportCsvBtn.setEnabled(true);
                 loadHistory();
 
+                String filterNote = "All Transactions".equals(filter) ? "" : "  [" + filter + "]";
                 statusLabel.setText(String.format(
-                        "Report generated: Income $%.2f  |  Expense $%.2f  |  Net $%.2f%s",
+                        "Income $%.2f  |  Expense $%.2f  |  Net $%.2f%s",
                         report.getTotalIncome(), report.getTotalExpense(),
-                        report.getNetSavings(), filterInfo));
+                        report.getNetSavings(), filterNote));
                 statusLabel.setForeground(new Color(39, 174, 96));
             } else {
-                statusLabel.setText("Report generation failed — no data found.");
+                statusLabel.setText("No transactions found for this period / filter.");
                 statusLabel.setForeground(new Color(200, 40, 40));
             }
         } catch (Exception ex) {
@@ -208,23 +207,13 @@ public class ReportPanel extends JPanel {
         }
     }
 
-    private String buildFilterSummary(String filterChoice) {
-        if ("All".equals(filterChoice)) return "";
-        Predicate<Transaction> predicate;
-        String label;
-        switch (filterChoice) {
-            case "By Type":
-                predicate = TransactionIterator.byType("EXPENSE");
-                label = "EXPENSE only";
-                break;
-            case "By Amount":
-                predicate = TransactionIterator.byAmountGreaterThan(100);
-                label = "> $100";
-                break;
-            default: return "";
+    private Predicate<Transaction> getFilterPredicate() {
+        switch ((String) filterByCombo.getSelectedItem()) {
+            case "Expenses Only":  return TransactionIterator.byType("EXPENSE");
+            case "Income Only":    return TransactionIterator.byType("INCOME");
+            case "Large (>$100)":  return TransactionIterator.byAmountGreaterThan(100);
+            default:               return null; // "All Transactions" → no filter
         }
-        List<Transaction> filtered = reportService.getFilteredTransactions(currentUserId, predicate);
-        return String.format("  [Filter: %s — %d txn(s)]", label, filtered.size());
     }
 
     private void loadHistory() {

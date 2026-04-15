@@ -16,6 +16,7 @@ import template.PDFExport;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 public class ReportService {
     private ReportDAO reportDAO = new ReportDAO();
@@ -27,21 +28,21 @@ public class ReportService {
     }
 
     public Report generateReport(long userId, String strategyType) {
+        return generateReport(userId, strategyType, null);
+    }
+
+    public Report generateReport(long userId, String strategyType, Predicate<Transaction> preFilter) {
         switch (strategyType.toUpperCase()) {
-            case "MONTHLY":
-                currentStrategy = new MonthlyReportStrategy();
-                break;
-            case "WEEKLY":
-                currentStrategy = new WeeklyReportStrategy();
-                break;
-            case "CATEGORY":
-                currentStrategy = new CategoryReportStrategy();
-                break;
-            default:
-                currentStrategy = new MonthlyReportStrategy();
+            case "MONTHLY":  currentStrategy = new MonthlyReportStrategy();  break;
+            case "WEEKLY":   currentStrategy = new WeeklyReportStrategy();   break;
+            case "CATEGORY": currentStrategy = new CategoryReportStrategy(); break;
+            default:         currentStrategy = new MonthlyReportStrategy();
         }
 
         List<Transaction> transactions = transactionDAO.findByUserId(userId);
+        if (preFilter != null) {
+            transactions = transactions.stream().filter(preFilter).collect(Collectors.toList());
+        }
         Report report = currentStrategy.generateReport(transactions, userId);
         if (report != null) {
             reportDAO.insert(report);

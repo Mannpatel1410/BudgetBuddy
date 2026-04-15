@@ -280,12 +280,25 @@ public class BudgetPanel extends JPanel {
                 "Clone Budgets", JOptionPane.YES_NO_OPTION);
 
         if (confirm == JOptionPane.YES_OPTION) {
+            // Check if previous month actually has budgets
+            List<Budget> prev = budgetService.getBudgetsForMonth(currentUserId, prevMonth, prevYear);
+            if (prev.isEmpty()) {
+                JOptionPane.showMessageDialog(this,
+                        "No budgets found for " + prevMonth + " " + prevYear + ".\nCreate budgets there first.",
+                        "Nothing to Clone", JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
             List<Budget> cloned = budgetService.cloneFromPreviousMonth(
                     currentUserId, prevMonth, prevYear, currentMonth, currentYear);
-            if (cloned.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "No budgets found for " + prevMonth + " " + prevYear);
+            int skipped = prev.size() - cloned.size();
+            if (cloned.isEmpty() && skipped > 0) {
+                JOptionPane.showMessageDialog(this,
+                        "All " + skipped + " budget(s) already exist for " + currentMonth + " " + currentYear + ".",
+                        "Already Up-to-date", JOptionPane.INFORMATION_MESSAGE);
             } else {
-                JOptionPane.showMessageDialog(this, cloned.size() + " budgets cloned successfully!");
+                String msg = cloned.size() + " budget(s) cloned to " + currentMonth + " " + currentYear + ".";
+                if (skipped > 0) msg += "\n(" + skipped + " skipped — already existed)";
+                JOptionPane.showMessageDialog(this, msg, "Clone Successful", JOptionPane.INFORMATION_MESSAGE);
                 loadBudgets();
             }
         }
