@@ -1,9 +1,11 @@
 package model.report;
 
 import model.category.Category;
+import model.transaction.Transaction;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 public class Report {
     private long id;
@@ -16,6 +18,8 @@ public class Report {
     private double netSavings;
     private LocalDateTime generatedAt;
     private List<Category> categories;
+    private List<Transaction> transactions;
+    private Map<Long, String> categoryNames;
 
     public Report() {}
 
@@ -51,4 +55,8 @@ public class Report {
     public void setGeneratedAt(LocalDateTime generatedAt) { this.generatedAt = generatedAt; }
     public List<Category> getCategories() { return categories; }
     public void setCategories(List<Category> categories) { this.categories = categories; }
+    public List<Transaction> getTransactions() { return transactions; }
+    public void setTransactions(List<Transaction> transactions) { this.transactions = transactions; }
+    public Map<Long, String> getCategoryNames() { return categoryNames; }
+    public void setCategoryNames(Map<Long, String> categoryNames) { this.categoryNames = categoryNames; }
 }

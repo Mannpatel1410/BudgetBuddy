@@ -1,13 +1,20 @@
 package strategy;
 
 import builder.ReportBuilder;
+import dao.CategoryDAO;
+import model.category.Category;
 import model.report.Report;
 import model.transaction.Transaction;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class WeeklyReportStrategy implements ReportStrategy {
+
+    private final CategoryDAO categoryDAO = new CategoryDAO();
 
     @Override
     public Report generateReport(List<Transaction> transactions, long userId) {
@@ -16,11 +23,13 @@ public class WeeklyReportStrategy implements ReportStrategy {
 
         double totalIncome  = 0;
         double totalExpense = 0;
+        List<Transaction> filtered = new ArrayList<>();
 
         for (Transaction t : transactions) {
             if (t.getTransactionDate() == null) continue;
             LocalDate txDate = t.getTransactionDate();
             if (!txDate.isBefore(weekStart) && !txDate.isAfter(now)) {
+                filtered.add(t);
                 if ("INCOME".equalsIgnoreCase(t.getType())) {
                     totalIncome += t.getAmount();
                 } else if ("EXPENSE".equalsIgnoreCase(t.getType())) {
@@ -29,12 +38,19 @@ public class WeeklyReportStrategy implements ReportStrategy {
             }
         }
 
+        Map<Long, String> catNames = new HashMap<>();
+        for (Category c : categoryDAO.findByUserId(userId)) {
+            catNames.put(c.getId(), c.getName());
+        }
+
         return new ReportBuilder(userId)
                 .setReportType("WEEKLY")
-                .setDateRange(weekStart, now)   // builder derives "weekStart to now" period string
-                .setFormat("DEFAULT")
+                .setDateRange(weekStart, now)
+                .setFormat("PDF")
                 .setTotalIncome(totalIncome)
                 .setTotalExpense(totalExpense)
+                .setTransactions(filtered)
+                .setCategoryNames(catNames)
                 .build();
     }
 }

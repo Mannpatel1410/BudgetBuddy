@@ -6,12 +6,17 @@ import model.transaction.Transaction;
 import service.ReportService;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.JTableHeader;
 import java.awt.*;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.function.Predicate;
 
 public class ReportPanel extends JPanel {
+    private static final DateTimeFormatter DISPLAY_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
     private JComboBox<String> reportTypeCombo;
     private JComboBox<String> filterByCombo;
     private JButton generateBtn;
@@ -19,27 +24,31 @@ public class ReportPanel extends JPanel {
     private JButton exportCsvBtn;
     private JTable reportHistoryTable;
     private DefaultTableModel tableModel;
+    private JLabel statusLabel;
 
     private final ReportService reportService = new ReportService();
-    private final long currentUserId = 1L;
+    private long currentUserId;
     private Report currentReport = null;
 
     public ReportPanel() {
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        // ── Top bar: type selector + filter + buttons ─────────────────────────
-        JPanel topBar = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        // ── Top bar ───────────────────────────────────────────────────────────
+        JPanel topBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
 
         reportTypeCombo = new JComboBox<>(new String[]{"MONTHLY", "WEEKLY", "CATEGORY"});
-        filterByCombo   = new JComboBox<>(new String[]{"All", "By Category", "By Type", "By Amount"});
+        filterByCombo   = new JComboBox<>(new String[]{"All", "By Type", "By Amount"});
         generateBtn  = new JButton("Generate Report");
         exportPdfBtn = new JButton("Export PDF");
         exportCsvBtn = new JButton("Export CSV");
 
-        // Export buttons start disabled until a report is generated
         exportPdfBtn.setEnabled(false);
         exportCsvBtn.setEnabled(false);
+
+        styleButton(generateBtn, new Color(52, 152, 219));
+        styleButton(exportPdfBtn, new Color(231, 76, 60));
+        styleButton(exportCsvBtn, new Color(39, 174, 96));
 
         topBar.add(new JLabel("Report Type:"));
         topBar.add(reportTypeCombo);
@@ -49,7 +58,18 @@ public class ReportPanel extends JPanel {
         topBar.add(exportPdfBtn);
         topBar.add(exportCsvBtn);
 
-        // ── Center: history table ─────────────────────────────────────────────
+        // ── Status label ──────────────────────────────────────────────────────
+        statusLabel = new JLabel(" ");
+        statusLabel.setFont(statusLabel.getFont().deriveFont(Font.ITALIC, 12f));
+        statusLabel.setForeground(new Color(100, 100, 100));
+        JPanel statusBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 2));
+        statusBar.add(statusLabel);
+
+        JPanel northPanel = new JPanel(new BorderLayout());
+        northPanel.add(topBar, BorderLayout.CENTER);
+        northPanel.add(statusBar, BorderLayout.SOUTH);
+
+        // ── History table ─────────────────────────────────────────────────────
         tableModel = new DefaultTableModel(
                 new Object[]{"Generated At", "Type", "Period", "Income", "Expense", "Net Savings"}, 0) {
             @Override
@@ -57,15 +77,120 @@ public class ReportPanel extends JPanel {
         };
         reportHistoryTable = new JTable(tableModel);
 
-        add(topBar, BorderLayout.NORTH);
+        // Style header
+        JTableHeader header = reportHistoryTable.getTableHeader();
+        header.setBackground(new Color(52, 73, 94));
+        header.setForeground(Color.WHITE);
+        header.setFont(header.getFont().deriveFont(Font.BOLD, 12f));
+        header.setPreferredSize(new Dimension(0, 30));
+        header.setReorderingAllowed(false);
+
+        reportHistoryTable.setRowHeight(26);
+        reportHistoryTable.setShowVerticalLines(false);
+        reportHistoryTable.setGridColor(new Color(235, 235, 235));
+        reportHistoryTable.setIntercellSpacing(new Dimension(0, 1));
+        reportHistoryTable.setSelectionBackground(new Color(210, 230, 255));
+        reportHistoryTable.setFont(reportHistoryTable.getFont().deriveFont(12f));
+
+        // Alternating rows + colored/right-aligned amount columns
+        reportHistoryTable.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable t, Object value,
+                    boolean sel, boolean focus, int row, int col) {
+                super.getTableCellRendererComponent(t, value, sel, focus, row, col);
+                if (!sel) {
+                    setBackground(row % 2 == 0 ? Color.WHITE : new Color(248, 249, 250));
+                    setForeground(Color.BLACK);
+                    setFont(getFont().deriveFont(Font.PLAIN));
+                    setHorizontalAlignment(SwingConstants.LEFT);
+                }
+                return this;
+            }
+        });
+
+        // Amount columns: Income (col 3) green, Expense (col 4) red, Net (col 5) conditional
+        DefaultTableCellRenderer amountRenderer = new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable t, Object value,
+                    boolean sel, boolean focus, int row, int col) {
+                super.getTableCellRendererComponent(t, value, sel, focus, row, col);
+                setHorizontalAlignment(SwingConstants.RIGHT);
+                setFont(getFont().deriveFont(Font.BOLD));
+                if (!sel) {
+                    setBackground(row % 2 == 0 ? Color.WHITE : new Color(248, 249, 250));
+                    if (col == 3) setForeground(new Color(40, 140, 50));
+                    else if (col == 4) setForeground(new Color(200, 40, 40));
+                    else if (col == 5) {
+                        // Net savings: green if positive/zero, red if negative
+                        if (value != null) {
+                            String v = value.toString().replace("$", "").replace(",", "");
+                            try {
+                                double d = Double.parseDouble(v);
+                                setForeground(d >= 0 ? new Color(40, 140, 50) : new Color(200, 40, 40));
+                            } catch (NumberFormatException ignored) {
+                                setForeground(Color.BLACK);
+                            }
+                        }
+                    }
+                }
+                return this;
+            }
+        };
+        reportHistoryTable.getColumnModel().getColumn(3).setCellRenderer(amountRenderer);
+        reportHistoryTable.getColumnModel().getColumn(4).setCellRenderer(amountRenderer);
+        reportHistoryTable.getColumnModel().getColumn(5).setCellRenderer(amountRenderer);
+
+        // Column widths
+        reportHistoryTable.getColumnModel().getColumn(0).setPreferredWidth(130);
+        reportHistoryTable.getColumnModel().getColumn(1).setPreferredWidth(80);
+        reportHistoryTable.getColumnModel().getColumn(2).setPreferredWidth(180);
+        reportHistoryTable.getColumnModel().getColumn(3).setPreferredWidth(90);
+        reportHistoryTable.getColumnModel().getColumn(4).setPreferredWidth(90);
+        reportHistoryTable.getColumnModel().getColumn(5).setPreferredWidth(100);
+
+        add(northPanel, BorderLayout.NORTH);
         add(new JScrollPane(reportHistoryTable), BorderLayout.CENTER);
 
+        // ── Listeners ─────────────────────────────────────────────────────────
         generateBtn.addActionListener(e -> generateReport());
-
         exportPdfBtn.addActionListener(e -> doExport("PDF", "report.pdf"));
         exportCsvBtn.addActionListener(e -> doExport("CSV", "report.csv"));
+    }
 
+    public void setUserId(long userId) {
+        this.currentUserId = userId;
         loadHistory();
+    }
+
+    private void generateReport() {
+        String type = (String) reportTypeCombo.getSelectedItem();
+        statusLabel.setText("Generating " + type + " report...");
+        statusLabel.setForeground(new Color(100, 100, 100));
+
+        try {
+            Report report = reportService.generateReport(currentUserId, type);
+            if (report != null) {
+                String filterChoice = (String) filterByCombo.getSelectedItem();
+                String filterInfo = buildFilterSummary(filterChoice);
+
+                currentReport = report;
+                exportPdfBtn.setEnabled(true);
+                exportCsvBtn.setEnabled(true);
+                loadHistory();
+
+                statusLabel.setText(String.format(
+                        "Report generated: Income $%.2f  |  Expense $%.2f  |  Net $%.2f%s",
+                        report.getTotalIncome(), report.getTotalExpense(),
+                        report.getNetSavings(), filterInfo));
+                statusLabel.setForeground(new Color(39, 174, 96));
+            } else {
+                statusLabel.setText("Report generation failed — no data found.");
+                statusLabel.setForeground(new Color(200, 40, 40));
+            }
+        } catch (Exception ex) {
+            statusLabel.setText("Error: " + ex.getMessage());
+            statusLabel.setForeground(new Color(200, 40, 40));
+        }
     }
 
     private void doExport(String format, String defaultFileName) {
@@ -73,80 +198,62 @@ public class ReportPanel extends JPanel {
         JFileChooser chooser = new JFileChooser();
         chooser.setSelectedFile(new java.io.File(defaultFileName));
         if (chooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
-            reportService.exportReport(currentReport, format,
-                    chooser.getSelectedFile().getAbsolutePath());
+            try {
+                reportService.exportReport(currentReport, format,
+                        chooser.getSelectedFile().getAbsolutePath());
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Export failed: " + ex.getMessage(),
+                        "Export Error", JOptionPane.ERROR_MESSAGE);
+            }
         }
     }
 
-    private void generateReport() {
-        String type = (String) reportTypeCombo.getSelectedItem();
-        Report report = reportService.generateReport(currentUserId, type);
-        if (report != null) {
-            // Apply the selected filter to show a summary in the dialog
-            String filterChoice = (String) filterByCombo.getSelectedItem();
-            String filterInfo   = buildFilterSummary(filterChoice);
-
-            JOptionPane.showMessageDialog(this,
-                    String.format("Report generated!%s%nIncome: $%.2f  Expense: $%.2f  Net: $%.2f",
-                            filterInfo,
-                            report.getTotalIncome(),
-                            report.getTotalExpense(),
-                            report.getNetSavings()),
-                    "Report Result", JOptionPane.INFORMATION_MESSAGE);
-
-            currentReport = report;
-            exportPdfBtn.setEnabled(true);
-            exportCsvBtn.setEnabled(true);
-            loadHistory();
-        } else {
-            JOptionPane.showMessageDialog(this,
-                    "Report generation not available for this type yet.",
-                    "Info", JOptionPane.INFORMATION_MESSAGE);
-        }
-    }
-
-    /**
-     * Uses TransactionIterator with the user-selected filter and returns a
-     * human-readable summary line appended to the report dialog.
-     */
     private String buildFilterSummary(String filterChoice) {
         if ("All".equals(filterChoice)) return "";
-
         Predicate<Transaction> predicate;
         String label;
         switch (filterChoice) {
-            case "By Category":
-                predicate = TransactionIterator.byCategory(1L); // default category 1
-                label = "category 1";
-                break;
             case "By Type":
                 predicate = TransactionIterator.byType("EXPENSE");
-                label = "type EXPENSE";
+                label = "EXPENSE only";
                 break;
             case "By Amount":
                 predicate = TransactionIterator.byAmountGreaterThan(100);
-                label = "amount > $100";
+                label = "> $100";
                 break;
-            default:
-                return "";
+            default: return "";
         }
-
         List<Transaction> filtered = reportService.getFilteredTransactions(currentUserId, predicate);
-        return String.format("%n[Filter: %s — %d transaction(s)]", label, filtered.size());
+        return String.format("  [Filter: %s — %d txn(s)]", label, filtered.size());
     }
 
     private void loadHistory() {
         tableModel.setRowCount(0);
-        List<Report> reports = reportService.getReportHistory(currentUserId);
-        for (Report r : reports) {
-            tableModel.addRow(new Object[]{
-                    r.getGeneratedAt() != null ? r.getGeneratedAt().toString() : "",
-                    r.getReportType(),
-                    r.getPeriod(),
-                    String.format("$%.2f", r.getTotalIncome()),
-                    String.format("$%.2f", r.getTotalExpense()),
-                    String.format("$%.2f", r.getNetSavings())
-            });
+        try {
+            List<Report> reports = reportService.getReportHistory(currentUserId);
+            for (Report r : reports) {
+                String genAt = r.getGeneratedAt() != null
+                        ? r.getGeneratedAt().format(DISPLAY_FMT) : "";
+                tableModel.addRow(new Object[]{
+                        genAt,
+                        r.getReportType(),
+                        r.getPeriod(),
+                        String.format("$%.2f", r.getTotalIncome()),
+                        String.format("$%.2f", r.getTotalExpense()),
+                        String.format("$%.2f", r.getNetSavings())
+                });
+            }
+        } catch (Exception ex) {
+            // DB not available — silently skip
         }
+    }
+
+    private void styleButton(JButton btn, Color bg) {
+        btn.setBackground(bg);
+        btn.setForeground(Color.WHITE);
+        btn.setFocusPainted(false);
+        btn.setBorderPainted(false);
+        btn.setOpaque(true);
+        btn.setFont(btn.getFont().deriveFont(Font.BOLD, 12f));
     }
 }

@@ -28,6 +28,8 @@ public class CategoryPanel extends JPanel {
         treeModel = new DefaultTreeModel(rootNode);
         categoryTree = new JTree(treeModel);
         categoryTree.setCellRenderer(new CategoryTreeRenderer());
+        categoryTree.setRowHeight(26);
+        categoryTree.setFont(categoryTree.getFont().deriveFont(13f));
         JScrollPane treeScroll = new JScrollPane(categoryTree);
 
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
@@ -135,21 +137,25 @@ public class CategoryPanel extends JPanel {
         }
     }
 
-    // Custom renderer to show category with icon text
+    // Custom renderer: shows "Name  (icon)" — icon as a small grey hint, not a prefix
     private static class CategoryTreeRenderer extends DefaultTreeCellRenderer {
         @Override
         public Component getTreeCellRendererComponent(JTree tree, Object value, boolean sel,
                 boolean expanded, boolean leaf, int row, boolean hasFocus) {
             super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus);
+            setFont(getFont().deriveFont(13f));
             if (value instanceof DefaultMutableTreeNode) {
                 Object obj = ((DefaultMutableTreeNode) value).getUserObject();
                 if (obj instanceof Category) {
                     Category cat = (Category) obj;
                     String display = cat.getName();
                     if (cat.getIcon() != null && !cat.getIcon().isEmpty()) {
-                        display = "[" + cat.getIcon() + "] " + display;
+                        display = cat.getName() + "  [" + cat.getIcon() + "]";
                     }
                     setText(display);
+                    if (cat.isDefault() && !sel) {
+                        setForeground(new Color(100, 100, 100));
+                    }
                 }
             }
             return this;

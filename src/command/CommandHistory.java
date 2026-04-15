@@ -3,8 +3,8 @@ package command;
 import java.util.Stack;
 
 public class CommandHistory {
-    private Stack<TransactionCommand> undoStack = new Stack<>();
-    private Stack<TransactionCommand> redoStack = new Stack<>();
+    private final Stack<TransactionCommand> undoStack = new Stack<>();
+    private final Stack<TransactionCommand> redoStack = new Stack<>();
 
     public void executeCommand(TransactionCommand cmd) {
         cmd.execute();
@@ -13,26 +13,30 @@ public class CommandHistory {
     }
 
     public void undo() {
-        if (!undoStack.isEmpty()) {
-            TransactionCommand cmd = undoStack.pop();
+        if (undoStack.isEmpty()) return;
+        TransactionCommand cmd = undoStack.pop();
+        try {
             cmd.undo();
             redoStack.push(cmd);
+        } catch (RuntimeException e) {
+            // Re-insert failed — put the command back so the user can retry
+            undoStack.push(cmd);
+            throw e;
         }
     }
 
     public void redo() {
-        if (!redoStack.isEmpty()) {
-            TransactionCommand cmd = redoStack.pop();
+        if (redoStack.isEmpty()) return;
+        TransactionCommand cmd = redoStack.pop();
+        try {
             cmd.execute();
             undoStack.push(cmd);
+        } catch (RuntimeException e) {
+            redoStack.push(cmd);
+            throw e;
         }
     }
 
-    public boolean canUndo() {
-        return !undoStack.isEmpty();
-    }
-
-    public boolean canRedo() {
-        return !redoStack.isEmpty();
-    }
+    public boolean canUndo() { return !undoStack.isEmpty(); }
+    public boolean canRedo() { return !redoStack.isEmpty(); }
 }

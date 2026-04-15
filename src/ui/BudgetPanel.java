@@ -36,9 +36,14 @@ public class BudgetPanel extends JPanel {
         setLayout(new BorderLayout(10, 10));
 
         // Top panel with controls
+        int currentYear = java.time.LocalDate.now().getYear();
+        int currentMonthIndex = java.time.LocalDate.now().getMonthValue() - 1;
+
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         monthCombo = new JComboBox<>(MONTHS);
-        yearCombo = new JComboBox<>(new Integer[]{2024, 2025, 2026, 2027});
+        monthCombo.setSelectedIndex(currentMonthIndex);
+        yearCombo = new JComboBox<>(new Integer[]{currentYear - 1, currentYear, currentYear + 1, currentYear + 2});
+        yearCombo.setSelectedItem(currentYear);
         addBudgetBtn = new JButton("Add Budget");
         cloneBtn = new JButton("Clone Previous Month");
         JButton refreshBtn = new JButton("Refresh");
@@ -82,55 +87,97 @@ public class BudgetPanel extends JPanel {
 
     public void loadBudgets() {
         budgetListPanel.removeAll();
+        budgetListPanel.setBackground(new Color(245, 245, 245));
+        budgetListPanel.setOpaque(true);
+        budgetListPanel.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+
         String month = (String) monthCombo.getSelectedItem();
         int year = (int) yearCombo.getSelectedItem();
 
         List<Budget> budgets = budgetService.getBudgetsForMonth(currentUserId, month, year);
 
         if (budgets.isEmpty()) {
-            budgetListPanel.add(new JLabel("  No budgets set for " + month + " " + year));
+            JLabel emptyLabel = new JLabel("No budgets set for " + month + " " + year, SwingConstants.CENTER);
+            emptyLabel.setFont(emptyLabel.getFont().deriveFont(Font.ITALIC, 13f));
+            emptyLabel.setForeground(Color.GRAY);
+            emptyLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+            budgetListPanel.add(Box.createVerticalStrut(30));
+            budgetListPanel.add(emptyLabel);
         }
 
         for (Budget b : budgets) {
-            JPanel row = new JPanel(new BorderLayout(10, 5));
-            row.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(0, 0, 1, 0, Color.LIGHT_GRAY),
-                BorderFactory.createEmptyBorder(8, 10, 8, 10)
-            ));
-            row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 65));
+            Color accent = statusColor(b);
+            String statusText = statusLabel(b);
 
             Category cat = categoryService.getById(b.getCategoryId());
             String catName = cat != null ? cat.getName() : "Unknown";
 
+            // ── Card ──────────────────────────────────────────────────────────
+            JPanel card = new JPanel(new BorderLayout(14, 0));
+            card.setBackground(Color.WHITE);
+            card.setOpaque(true);
+            card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 78));
+            card.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createCompoundBorder(
+                    BorderFactory.createMatteBorder(0, 5, 0, 0, accent),
+                    BorderFactory.createLineBorder(new Color(220, 220, 220), 1)
+                ),
+                BorderFactory.createEmptyBorder(10, 14, 10, 14)
+            ));
+
+            // ── Left: name + remaining ─────────────────────────────────────────
+            JPanel leftPanel = new JPanel();
+            leftPanel.setLayout(new BoxLayout(leftPanel, BoxLayout.Y_AXIS));
+            leftPanel.setOpaque(false);
+            leftPanel.setPreferredSize(new Dimension(145, 56));
+
             JLabel nameLabel = new JLabel(catName);
-            nameLabel.setFont(nameLabel.getFont().deriveFont(Font.BOLD));
-            nameLabel.setPreferredSize(new Dimension(130, 30));
+            nameLabel.setFont(nameLabel.getFont().deriveFont(Font.BOLD, 13f));
 
-            JProgressBar progressBar = new JProgressBar(0, 100);
-            int pct = (int) Math.min(b.getPercentageUsed(), 100);
-            progressBar.setValue(pct);
-            progressBar.setStringPainted(true);
-            progressBar.setString("$" + String.format("%.0f", b.getSpentAmount())
-                    + " / $" + String.format("%.0f", b.getLimitAmount())
-                    + " (" + String.format("%.0f", b.getPercentageUsed()) + "%)");
+            double remaining = b.getLimitAmount() - b.getSpentAmount();
+            String remainTxt = remaining >= 0
+                    ? String.format("$%.0f left", remaining)
+                    : String.format("$%.0f over", -remaining);
+            JLabel remainLabel = new JLabel(remainTxt);
+            remainLabel.setFont(remainLabel.getFont().deriveFont(Font.PLAIN, 11f));
+            remainLabel.setForeground(remaining >= 0 ? new Color(100, 100, 100) : new Color(244, 67, 54));
 
-            switch (b.getStatusColor()) {
-                case "GREEN": progressBar.setForeground(new Color(76, 175, 80)); break;
-                case "YELLOW": progressBar.setForeground(new Color(255, 193, 7)); break;
-                case "RED": progressBar.setForeground(new Color(244, 67, 54)); break;
-            }
+            leftPanel.add(nameLabel);
+            leftPanel.add(Box.createVerticalStrut(5));
+            leftPanel.add(remainLabel);
 
-            JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-            JLabel statusLabel = new JLabel(b.getStatus());
-            statusLabel.setFont(statusLabel.getFont().deriveFont(Font.BOLD, 11f));
-            switch (b.getStatusColor()) {
-                case "GREEN": statusLabel.setForeground(new Color(76, 175, 80)); break;
-                case "YELLOW": statusLabel.setForeground(new Color(255, 193, 7)); break;
-                case "RED": statusLabel.setForeground(new Color(244, 67, 54)); break;
-            }
+            // ── Center: progress bar ───────────────────────────────────────────
+            JProgressBar bar = new JProgressBar(0, 100);
+            bar.setValue((int) Math.min(b.getPercentageUsed(), 100));
+            bar.setStringPainted(true);
+            bar.setString(String.format("$%.0f / $%.0f  (%.0f%%)",
+                    b.getSpentAmount(), b.getLimitAmount(), b.getPercentageUsed()));
+            bar.setFont(bar.getFont().deriveFont(Font.BOLD, 11f));
+            bar.setPreferredSize(new Dimension(0, 30));
+            // Force BasicProgressBarUI so setForeground() works on all platforms
+            bar.setUI(new javax.swing.plaf.basic.BasicProgressBarUI() {
+                @Override protected Color getSelectionForeground() { return Color.WHITE; }
+                @Override protected Color getSelectionBackground() { return Color.WHITE; }
+            });
+            bar.setForeground(accent);
+            bar.setBackground(new Color(225, 225, 225));
 
-            JButton deleteBtn = new JButton("X");
-            deleteBtn.setMargin(new Insets(2, 6, 2, 6));
+            // ── Right: status badge + delete ───────────────────────────────────
+            JPanel rightPanel = new JPanel();
+            rightPanel.setLayout(new BoxLayout(rightPanel, BoxLayout.Y_AXIS));
+            rightPanel.setOpaque(false);
+            rightPanel.setPreferredSize(new Dimension(160, 56));
+
+            JLabel statusLbl = new JLabel("● " + statusText, SwingConstants.RIGHT);
+            statusLbl.setFont(statusLbl.getFont().deriveFont(Font.BOLD, 11f));
+            statusLbl.setForeground(accent);
+            statusLbl.setAlignmentX(Component.RIGHT_ALIGNMENT);
+
+            JButton deleteBtn = new JButton("Delete");
+            deleteBtn.setFont(deleteBtn.getFont().deriveFont(Font.PLAIN, 11f));
+            deleteBtn.setForeground(new Color(180, 50, 50));
+            deleteBtn.setFocusPainted(false);
+            deleteBtn.setAlignmentX(Component.RIGHT_ALIGNMENT);
             deleteBtn.addActionListener(e -> {
                 int confirm = JOptionPane.showConfirmDialog(this,
                         "Delete budget for " + catName + "?", "Confirm", JOptionPane.YES_NO_OPTION);
@@ -140,19 +187,39 @@ public class BudgetPanel extends JPanel {
                 }
             });
 
-            rightPanel.add(statusLabel);
+            rightPanel.add(statusLbl);
+            rightPanel.add(Box.createVerticalStrut(6));
             rightPanel.add(deleteBtn);
 
-            row.add(nameLabel, BorderLayout.WEST);
-            row.add(progressBar, BorderLayout.CENTER);
-            row.add(rightPanel, BorderLayout.EAST);
+            card.add(leftPanel, BorderLayout.WEST);
+            card.add(bar,       BorderLayout.CENTER);
+            card.add(rightPanel, BorderLayout.EAST);
 
-            budgetListPanel.add(row);
+            budgetListPanel.add(card);
+            budgetListPanel.add(Box.createVerticalStrut(8));
         }
 
         updateNotificationBell();
         budgetListPanel.revalidate();
         budgetListPanel.repaint();
+    }
+
+    private Color statusColor(Budget b) {
+        switch (b.getStatusColor()) {
+            case "GREEN":  return new Color(56, 161, 63);
+            case "YELLOW": return new Color(230, 130, 0);
+            case "RED":    return new Color(220, 50, 50);
+            default:       return Color.GRAY;
+        }
+    }
+
+    private String statusLabel(Budget b) {
+        switch (b.getStatus()) {
+            case "UNDER_LIMIT":       return "On Track";
+            case "APPROACHING_LIMIT": return "Approaching Limit";
+            case "EXCEEDED":          return "Exceeded";
+            default:                  return b.getStatus();
+        }
     }
 
     private void addBudget() {
