@@ -71,8 +71,6 @@ public class DashboardPanel extends JPanel {
         add(northPanel,    BorderLayout.NORTH);
         add(scrollPane,    BorderLayout.CENTER);
         add(barChartPanel, BorderLayout.SOUTH);
-
-        loadDashboard(currentUserId);
     }
 
     public void loadDashboard(long userId) {

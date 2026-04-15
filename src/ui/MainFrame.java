@@ -135,9 +135,12 @@ public class MainFrame extends JFrame {
 
     public void onLoginSuccess(User user) {
         setCurrentUser(user);
+        accountPanel.setUserId(user.getId());
+        transactionPanel.setUserId(user.getId());
         categoryPanel.loadTree(user.getId());
         budgetPanel.setUserId(user.getId());
         budgetPanel.loadBudgets();
+        reportPanel.setUserId(user.getId());
         dashboardPanel.loadDashboard(user.getId());
         profilePanel.loadProfile(user.getId());
         showPanel("dashboard");

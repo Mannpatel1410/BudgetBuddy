@@ -2,9 +2,11 @@ package builder;
 
 import model.report.Report;
 import model.category.Category;
+import model.transaction.Transaction;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 public class ReportBuilder {
     private long userId;
@@ -14,6 +16,8 @@ public class ReportBuilder {
     private double totalIncome;
     private double totalExpense;
     private List<Category> categories;
+    private List<Transaction> transactions;
+    private Map<Long, String> categoryNames;
     private LocalDate startDate;
     private LocalDate endDate;
 
@@ -51,6 +55,16 @@ public class ReportBuilder {
         return this;
     }
 
+    public ReportBuilder setTransactions(List<Transaction> transactions) {
+        this.transactions = transactions;
+        return this;
+    }
+
+    public ReportBuilder setCategoryNames(Map<Long, String> categoryNames) {
+        this.categoryNames = categoryNames;
+        return this;
+    }
+
     public ReportBuilder setDateRange(LocalDate start, LocalDate end) {
         this.startDate = start;
         this.endDate = end;
@@ -75,6 +89,12 @@ public class ReportBuilder {
         report.setGeneratedAt(LocalDateTime.now());
         if (categories != null) {
             report.setCategories(categories);
+        }
+        if (transactions != null) {
+            report.setTransactions(transactions);
+        }
+        if (categoryNames != null) {
+            report.setCategoryNames(categoryNames);
         }
         return report;
     }

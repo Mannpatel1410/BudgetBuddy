@@ -1,32 +1,43 @@
 package template;
 
 import model.report.Report;
+import model.transaction.Transaction;
 
 import javax.swing.*;
-import java.awt.*;
-import java.awt.print.*;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 /**
- * Exports a Report as a PDF-style printable document using Java's built-in
- * printing API (java.awt.print). No external library required.
- * The content is built incrementally across the four template steps and then
- * rendered to the printer/PDF writer in save().
+ * Exports a Report as a real PDF file (PDF 1.4, single or multi-page).
+ * Uses only the Java standard library — no external PDF library required.
+ * The content stream is built across the four template steps, then written
+ * to the user-chosen file path with a proper xref table so macOS Preview
+ * (and any PDF reader) can open it.
  */
 public class PDFExport extends ExportTemplate {
 
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final int FONT_PT     = 10;
+    private static final int LEADING     = 13;   // vertical gap between lines (points)
+    private static final int MARGIN_LEFT = 50;
+    private static final int TOP_Y       = 740;  // first line y-coordinate
+    private static final int BOTTOM_Y    = 50;   // stop drawing below this y
+    private static final int LINES_PER_PAGE = (TOP_Y - BOTTOM_Y) / LEADING; // ~53
 
-    // Lines accumulated across the four template steps
-    private final java.util.List<String> lines = new java.util.ArrayList<>();
+    private final List<String> lines = new ArrayList<>();
+
+    // ── Template steps ────────────────────────────────────────────────────────
 
     @Override
     protected void prepareHeader(Report report) {
         lines.clear();
-        lines.add("===================================");
-        lines.add("  BudgetBuddy Report - " + report.getReportType());
-        lines.add("===================================");
-        lines.add("Period    : " + report.getPeriod());
+        lines.add("BudgetBuddy - " + report.getReportType() + " Report");
+        lines.add("==========================================================");
+        lines.add("Period    : " + nvl(report.getPeriod()));
         lines.add("Generated : " + (report.getGeneratedAt() != null
                 ? report.getGeneratedAt().format(FMT) : "N/A"));
         lines.add("");
@@ -34,19 +45,44 @@ public class PDFExport extends ExportTemplate {
 
     @Override
     protected void writeBody(Report report) {
-        lines.add("-----------------------------------");
-        lines.add(String.format("%-20s %12s", "Total Income",
-                String.format("$%.2f", report.getTotalIncome())));
-        lines.add(String.format("%-20s %12s", "Total Expense",
-                String.format("$%.2f", report.getTotalExpense())));
-        lines.add(String.format("%-20s %12s", "Net Savings",
-                String.format("$%.2f", report.getNetSavings())));
-        lines.add("-----------------------------------");
+        lines.add("SUMMARY");
+        lines.add("----------------------------------------------------------");
+        lines.add(String.format("%-22s $%.2f", "Total Income  :", report.getTotalIncome()));
+        lines.add(String.format("%-22s $%.2f", "Total Expense :", report.getTotalExpense()));
+        lines.add(String.format("%-22s $%.2f", "Net Savings   :", report.getNetSavings()));
+        lines.add("----------------------------------------------------------");
         lines.add("");
+
+        List<Transaction> txns = report.getTransactions();
+        if (txns == null || txns.isEmpty()) {
+            lines.add("No transactions found for this period.");
+            return;
+        }
+
+        Map<Long, String> catNames = report.getCategoryNames();
+        lines.add("TRANSACTIONS (" + txns.size() + " records)");
+        lines.add("----------------------------------------------------------");
+        lines.add(String.format("%-12s %-10s %-15s %10s  %s",
+                "Date", "Type", "Category", "Amount", "Description"));
+        lines.add("----------------------------------------------------------");
+
+        for (Transaction t : txns) {
+            String date = t.getTransactionDate() != null ? t.getTransactionDate().toString() : "N/A";
+            String cat  = (catNames != null)
+                    ? catNames.getOrDefault(t.getCategoryId(), "Cat#" + t.getCategoryId())
+                    : "Cat#" + t.getCategoryId();
+            if (cat.length() > 14) cat = cat.substring(0, 13) + ".";
+            String desc = nvl(t.getDescription());
+            if (desc.length() > 28) desc = desc.substring(0, 25) + "...";
+            lines.add(String.format("%-12s %-10s %-15s %10s  %s",
+                    date, t.getType(), cat,
+                    String.format("$%.2f", t.getAmount()), desc));
+        }
     }
 
     @Override
     protected void formatFooter(Report report) {
+        lines.add("----------------------------------------------------------");
         lines.add("Generated by BudgetBuddy");
         if (report.getGeneratedAt() != null) {
             lines.add(report.getGeneratedAt().format(FMT));
@@ -55,40 +91,130 @@ public class PDFExport extends ExportTemplate {
 
     @Override
     protected void save(Report report, String filePath) {
-        // Use Java's PrinterJob to send the content to a PDF printer / print dialog
-        PrinterJob job = PrinterJob.getPrinterJob();
-        job.setJobName("BudgetBuddy_Report_" + report.getReportType());
-
-        job.setPrintable((graphics, pageFormat, pageIndex) -> {
-            if (pageIndex > 0) return Printable.NO_SUCH_PAGE;
-
-            Graphics2D g2 = (Graphics2D) graphics;
-            g2.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
-            FontMetrics fm = g2.getFontMetrics();
-            int lineHeight = fm.getHeight();
-
-            int x = (int) pageFormat.getImageableX() + 10;
-            int y = (int) pageFormat.getImageableY() + lineHeight;
-
-            for (String line : lines) {
-                g2.drawString(line, x, y);
-                y += lineHeight;
-            }
-            return Printable.PAGE_EXISTS;
-        });
-
-        // Show print dialog so the user can choose "Save as PDF" or a printer
-        if (job.printDialog()) {
-            try {
-                job.print();
-                JOptionPane.showMessageDialog(null,
-                        "Report sent to printer / PDF writer successfully.",
-                        "Export PDF", JOptionPane.INFORMATION_MESSAGE);
-            } catch (PrinterException e) {
-                JOptionPane.showMessageDialog(null,
-                        "PDF export failed: " + e.getMessage(),
-                        "Export Error", JOptionPane.ERROR_MESSAGE);
-            }
+        try {
+            writePDF(filePath);
+            JOptionPane.showMessageDialog(null,
+                    "PDF exported successfully:\n" + filePath,
+                    "Export PDF", JOptionPane.INFORMATION_MESSAGE);
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(null,
+                    "PDF export failed: " + e.getMessage(),
+                    "Export Error", JOptionPane.ERROR_MESSAGE);
         }
     }
+
+    // ── PDF generation ────────────────────────────────────────────────────────
+
+    private void writePDF(String filePath) throws IOException {
+        // Paginate: split lines into page-sized chunks
+        List<List<String>> pages = new ArrayList<>();
+        for (int i = 0; i < lines.size(); i += LINES_PER_PAGE) {
+            pages.add(new ArrayList<>(lines.subList(i, Math.min(i + LINES_PER_PAGE, lines.size()))));
+        }
+        if (pages.isEmpty()) pages.add(new ArrayList<>());
+
+        int nPages = pages.size();
+        // Object layout:
+        //   1         = Catalog
+        //   2         = Pages dictionary
+        //   3..2+n    = Page objects  (one per page)
+        //   3+n..2+2n = Content streams (one per page)
+        //   3+2n      = Font
+        int fontId    = 3 + 2 * nPages;
+        int totalObjs = fontId;
+
+        // Build content streams (need their lengths before writing objects)
+        List<byte[]> streams = new ArrayList<>();
+        for (List<String> pl : pages) streams.add(buildStream(pl));
+
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+        int[] off = new int[totalObjs + 1]; // off[i] = byte offset of object i
+
+        // ── PDF header ────────────────────────────────────────────────────────
+        raw(buf, "%PDF-1.4\n");
+        buf.write(new byte[]{0x25, (byte)0xE2, (byte)0xE3, (byte)0xCF, (byte)0xD3, 0x0A}); // binary comment
+
+        // ── Object 1: Catalog ─────────────────────────────────────────────────
+        off[1] = buf.size();
+        raw(buf, "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
+
+        // ── Object 2: Pages ───────────────────────────────────────────────────
+        StringBuilder kids = new StringBuilder("[");
+        for (int i = 0; i < nPages; i++) {
+            if (i > 0) kids.append(' ');
+            kids.append(3 + i).append(" 0 R");
+        }
+        kids.append(']');
+        off[2] = buf.size();
+        raw(buf, "2 0 obj\n<< /Type /Pages /Kids " + kids + " /Count " + nPages + " >>\nendobj\n");
+
+        // ── Page objects (3 … 2+n) ────────────────────────────────────────────
+        for (int i = 0; i < nPages; i++) {
+            int pageId    = 3 + i;
+            int contentId = 3 + nPages + i;
+            off[pageId] = buf.size();
+            raw(buf, pageId + " 0 obj\n"
+                    + "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792]\n"
+                    + "   /Contents " + contentId + " 0 R\n"
+                    + "   /Resources << /Font << /F1 " + fontId + " 0 R >> >> >>\n"
+                    + "endobj\n");
+        }
+
+        // ── Content stream objects (3+n … 2+2n) ──────────────────────────────
+        for (int i = 0; i < nPages; i++) {
+            int contentId = 3 + nPages + i;
+            byte[] s = streams.get(i);
+            off[contentId] = buf.size();
+            raw(buf, contentId + " 0 obj\n<< /Length " + s.length + " >>\nstream\n");
+            buf.write(s);
+            raw(buf, "\nendstream\nendobj\n");
+        }
+
+        // ── Font object ───────────────────────────────────────────────────────
+        off[fontId] = buf.size();
+        raw(buf, fontId + " 0 obj\n"
+                + "<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>\n"
+                + "endobj\n");
+
+        // ── Cross-reference table ─────────────────────────────────────────────
+        int xrefOffset = buf.size();
+        raw(buf, "xref\n0 " + (totalObjs + 1) + "\n");
+        raw(buf, "0000000000 65535 f \n");           // entry for obj 0 (free)
+        for (int i = 1; i <= totalObjs; i++) {
+            raw(buf, String.format("%010d 00000 n \n", off[i])); // 20 bytes exactly
+        }
+
+        // ── Trailer ───────────────────────────────────────────────────────────
+        raw(buf, "trailer\n<< /Size " + (totalObjs + 1) + " /Root 1 0 R >>\n"
+                + "startxref\n" + xrefOffset + "\n%%EOF\n");
+
+        try (FileOutputStream fos = new FileOutputStream(filePath)) {
+            buf.writeTo(fos);
+        }
+    }
+
+    /** Build a PDF content stream (BT … ET) for one page of lines. */
+    private byte[] buildStream(List<String> pageLines) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("BT\n");
+        sb.append("/F1 ").append(FONT_PT).append(" Tf\n");
+        sb.append(LEADING).append(" TL\n");
+        sb.append(MARGIN_LEFT).append(' ').append(TOP_Y).append(" Td\n");
+        for (String line : pageLines) {
+            // Strip to printable ASCII so Courier Type1 can render everything
+            String safe = line.replaceAll("[^\\x20-\\x7E]", "?");
+            // Escape PDF string special characters
+            String esc  = safe.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)");
+            sb.append('(').append(esc).append(") Tj T*\n");
+        }
+        sb.append("ET\n");
+        return sb.toString().getBytes(StandardCharsets.US_ASCII);
+    }
+
+    /** Write an ASCII string directly to the buffer. */
+    private void raw(ByteArrayOutputStream buf, String s) throws IOException {
+        buf.write(s.getBytes(StandardCharsets.US_ASCII));
+    }
+
+    private String nvl(String s) { return s != null ? s : ""; }
 }

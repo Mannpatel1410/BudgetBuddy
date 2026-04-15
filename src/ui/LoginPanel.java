@@ -53,6 +53,7 @@ public class LoginPanel extends JPanel {
             String password = new String(passwordField.getPassword());
             User user = userService.login(email, password);
             if (user != null) {
+                passwordField.setText("");
                 mainFrame.onLoginSuccess(user);
             } else {
                 JOptionPane.showMessageDialog(this, "Invalid email or password.", "Login Failed", JOptionPane.ERROR_MESSAGE);
