@@ -46,7 +46,6 @@ public class BudgetPanel extends JPanel {
         yearCombo.setSelectedItem(currentYear);
         addBudgetBtn = new JButton("Add Budget");
         cloneBtn = new JButton("Clone Previous Month");
-        JButton refreshBtn = new JButton("Refresh");
 
         // Notification bell
         notificationBell = new JLabel("Alerts (0)");
@@ -65,7 +64,6 @@ public class BudgetPanel extends JPanel {
         topPanel.add(yearCombo);
         topPanel.add(addBudgetBtn);
         topPanel.add(cloneBtn);
-        topPanel.add(refreshBtn);
         topPanel.add(Box.createHorizontalStrut(20));
         topPanel.add(notificationBell);
 
@@ -75,7 +73,10 @@ public class BudgetPanel extends JPanel {
 
         addBudgetBtn.addActionListener(e -> addBudget());
         cloneBtn.addActionListener(e -> clonePreviousMonth());
-        refreshBtn.addActionListener(e -> loadBudgets());
+
+        // Auto-refresh when month or year changes — no manual Refresh button needed
+        monthCombo.addActionListener(e -> { if (currentUserId > 0) loadBudgets(); });
+        yearCombo.addActionListener(e -> { if (currentUserId > 0) loadBudgets(); });
 
         add(topPanel, BorderLayout.NORTH);
         add(scrollPane, BorderLayout.CENTER);

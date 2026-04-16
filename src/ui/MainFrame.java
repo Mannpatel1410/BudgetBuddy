@@ -35,7 +35,8 @@ public class MainFrame extends JFrame {
     public MainFrame() {
         setTitle("BudgetBuddy");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(1000, 650);
+        setSize(1000, 700);
+        setMinimumSize(new Dimension(800, 650));
         setLocationRelativeTo(null);
 
         cardLayout = new CardLayout();
