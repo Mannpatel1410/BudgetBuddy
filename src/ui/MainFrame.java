@@ -4,6 +4,8 @@ import model.User;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class MainFrame extends JFrame {
     private CardLayout cardLayout;
@@ -25,10 +27,16 @@ public class MainFrame extends JFrame {
 
     private User currentUser;
 
+    // Nav button registry — key = panel name, value = sidebar button
+    private final Map<String, JButton> navButtons = new LinkedHashMap<>();
+    private static final Color NAV_DEFAULT = new Color(52, 73, 94);
+    private static final Color NAV_ACTIVE  = new Color(74, 110, 145);
+
     public MainFrame() {
         setTitle("BudgetBuddy");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(1000, 650);
+        setSize(1000, 700);
+        setMinimumSize(new Dimension(800, 650));
         setLocationRelativeTo(null);
 
         cardLayout = new CardLayout();
@@ -60,13 +68,13 @@ public class MainFrame extends JFrame {
         contentLayout = new CardLayout();
         contentPanel = new JPanel(contentLayout);
 
-        contentPanel.add(dashboardPanel, "dashboard");
-        contentPanel.add(accountPanel, "accounts");
+        contentPanel.add(dashboardPanel,   "dashboard");
+        contentPanel.add(accountPanel,     "accounts");
         contentPanel.add(transactionPanel, "transactions");
-        contentPanel.add(categoryPanel, "categories");
-        contentPanel.add(budgetPanel, "budgets");
-        contentPanel.add(reportPanel, "reports");
-        contentPanel.add(profilePanel, "profile");
+        contentPanel.add(categoryPanel,    "categories");
+        contentPanel.add(budgetPanel,      "budgets");
+        contentPanel.add(reportPanel,      "reports");
+        contentPanel.add(profilePanel,     "profile");
 
         JPanel sidebar = new JPanel();
         sidebar.setLayout(new BoxLayout(sidebar, BoxLayout.Y_AXIS));
@@ -86,7 +94,9 @@ public class MainFrame extends JFrame {
 
         for (String[] item : navItems) {
             JButton btn = createNavButton(item[0]);
-            btn.addActionListener(e -> contentLayout.show(contentPanel, item[1]));
+            navButtons.put(item[1], btn);
+            String panelKey = item[1];
+            btn.addActionListener(e -> setActivePanel(panelKey));
             sidebar.add(btn);
             sidebar.add(Box.createVerticalStrut(5));
         }
@@ -95,6 +105,7 @@ public class MainFrame extends JFrame {
         logoutBtn.setBackground(new Color(192, 57, 43));
         logoutBtn.addActionListener(e -> {
             currentUser = null;
+            navButtons.values().forEach(b -> b.setBackground(NAV_DEFAULT));
             cardLayout.show(mainPanel, "login");
         });
         sidebar.add(Box.createVerticalGlue());
@@ -109,27 +120,37 @@ public class MainFrame extends JFrame {
         JButton btn = new JButton(label);
         btn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
         btn.setAlignmentX(Component.CENTER_ALIGNMENT);
-        btn.setBackground(new Color(52, 73, 94));
+        btn.setBackground(NAV_DEFAULT);
         btn.setForeground(Color.WHITE);
         btn.setFocusPainted(false);
         btn.setBorderPainted(false);
         return btn;
     }
 
-    public void setCurrentUser(User user) {
-        this.currentUser = user;
+    /** Show the named content panel and highlight its sidebar button. */
+    private void setActivePanel(String panelName) {
+        contentLayout.show(contentPanel, panelName);
+        navButtons.values().forEach(b -> b.setBackground(NAV_DEFAULT));
+        JButton active = navButtons.get(panelName);
+        if (active != null) {
+            active.setBackground(NAV_ACTIVE);
+            active.setFont(active.getFont().deriveFont(Font.BOLD));
+        }
+        // Restore plain font on all others
+        navButtons.forEach((key, btn) -> {
+            if (!key.equals(panelName)) btn.setFont(btn.getFont().deriveFont(Font.PLAIN));
+        });
     }
 
-    public User getCurrentUser() {
-        return currentUser;
-    }
+    public void setCurrentUser(User user) { this.currentUser = user; }
+    public User getCurrentUser()          { return currentUser; }
 
     public void showPanel(String name) {
         if ("login".equals(name) || "signup".equals(name)) {
             cardLayout.show(mainPanel, name);
         } else {
             cardLayout.show(mainPanel, "app");
-            contentLayout.show(contentPanel, name);
+            setActivePanel(name);
         }
     }
 
@@ -143,7 +164,8 @@ public class MainFrame extends JFrame {
         reportPanel.setUserId(user.getId());
         dashboardPanel.loadDashboard(user.getId());
         profilePanel.loadProfile(user.getId());
-        showPanel("dashboard");
+        cardLayout.show(mainPanel, "app");
+        setActivePanel("dashboard");
     }
 
     public static void main(String[] args) {

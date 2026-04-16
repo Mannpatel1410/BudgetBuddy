@@ -12,14 +12,20 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Filters transactions to the current calendar week (Monday → today) regardless
+ * of what the service pre-filtered.  The service calls clearPeriod() before
+ * invoking this strategy so that all user transactions arrive here unfiltered.
+ * The period label is set to the actual date range ("2026-04-13 to 2026-04-15").
+ */
 public class WeeklyReportStrategy implements ReportStrategy {
 
     private final CategoryDAO categoryDAO = new CategoryDAO();
 
     @Override
     public Report generateReport(List<Transaction> transactions, long userId) {
-        LocalDate now = LocalDate.now();
-        LocalDate weekStart = now.minusDays(now.getDayOfWeek().getValue() - 1);
+        LocalDate today     = LocalDate.now();
+        LocalDate weekStart = today.minusDays(today.getDayOfWeek().getValue() - 1); // Monday
 
         double totalIncome  = 0;
         double totalExpense = 0;
@@ -27,14 +33,14 @@ public class WeeklyReportStrategy implements ReportStrategy {
 
         for (Transaction t : transactions) {
             if (t.getTransactionDate() == null) continue;
-            LocalDate txDate = t.getTransactionDate();
-            if (!txDate.isBefore(weekStart) && !txDate.isAfter(now)) {
-                filtered.add(t);
-                if ("INCOME".equalsIgnoreCase(t.getType())) {
-                    totalIncome += t.getAmount();
-                } else if ("EXPENSE".equalsIgnoreCase(t.getType())) {
-                    totalExpense += t.getAmount();
-                }
+            LocalDate d = t.getTransactionDate();
+            if (d.isBefore(weekStart) || d.isAfter(today)) continue;
+
+            filtered.add(t);
+            if ("INCOME".equalsIgnoreCase(t.getType())) {
+                totalIncome += t.getAmount();
+            } else if ("EXPENSE".equalsIgnoreCase(t.getType())) {
+                totalExpense += t.getAmount();
             }
         }
 
@@ -45,7 +51,7 @@ public class WeeklyReportStrategy implements ReportStrategy {
 
         return new ReportBuilder(userId)
                 .setReportType("WEEKLY")
-                .setDateRange(weekStart, now)
+                .setDateRange(weekStart, today)   // period = "2026-04-13 to 2026-04-15"
                 .setFormat("PDF")
                 .setTotalIncome(totalIncome)
                 .setTotalExpense(totalExpense)
